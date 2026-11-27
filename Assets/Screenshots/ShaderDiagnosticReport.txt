@@ -1,0 +1,18 @@
+=== COMPREHENSIVE SHADER & MATERIAL AUDIT ===
+Time: 2026-11-17 19:50:32 UTC
+Unity Version: 6000.3.27f1
+Active Render Pipeline: Built-in Render Pipeline (Standard)
+Active Scene: NewtonEnvironment (Assets/Scenes/NewtonEnvironment.unity)
+
+--- RENDERERS (751) ---
+
+--- UI GRAPHICS (232) ---
+
+--- SHADER USAGE BREAKDOWN ---
+Shader: 'Standard' -> 742 objects
+   Examples: TeleBeam, LintelGlow.002, PostGlow, GlobeDot_10, Floor Cyan Inlay.003
+Shader: 'GUI/Text Shader' -> 9 objects
+   Examples: Text_ExperimentNumber, LiveSensorDataText, FloatingStatusText, LiveFrictionText_FrictionConsole, Text_LawTitle
+Shader: 'UI/Default' -> 232 objects
+
+--- BROKEN / PINK ITEMS (0) ---

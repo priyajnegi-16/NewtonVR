@@ -1,0 +1,1172 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using TMPro;
+
+// Explicit aliases for XR Input
+using XRInputDevice = UnityEngine.XR.InputDevice;
+using XRInputDevices = UnityEngine.XR.InputDevices;
+using XRCommonUsages = UnityEngine.XR.CommonUsages;
+using XRNode = UnityEngine.XR.XRNode;
+
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
+
+/// <summary>
+/// Premium Champagne Gold, Warm Ivory & Emerald Green 3D Floating VR Destination Panel.
+/// Reproduces the exact visual reference:
+/// - Smoked-bronze charcoal glass backplate.
+/// - Glowing metallic champagne-gold beveled border.
+/// - Crisp, bold Pure White (#FFFFFF) & Warm Ivory (#FFF8E7) TextMeshPro typography.
+/// - 4 large, visually distinct buttons with emerald-green accent bars and gold arrow indicators.
+/// - Atom icon beside the main header.
+/// - Upper-right close button.
+/// - Interaction: Meta Quest 3S double-pinch to open/close, hand pinch or controller ray+trigger to select.
+/// - Auto-hides after successful teleportation.
+/// - Preserves direct shortcuts: M (MainLobby), T (Lab 1), K (Lab 2), L (Lab 3), N (Toggle Panel).
+/// </summary>
+public class FloatingVRDestinationPanel : MonoBehaviour
+{
+    [Header("Player & XR Rig References")]
+    public CharacterController characterController;
+    public Camera playerCamera;
+    public Transform rightHandController;
+    public Transform leftHandController;
+
+    [Header("Panel Positioning & Follow")]
+    [Tooltip("Distance in front of player headset.")]
+    public float followDistance = 1.25f;
+
+    [Tooltip("Vertical height offset relative to headset eye level.")]
+    public float verticalOffset = -0.12f;
+
+    [Tooltip("Upward tilt angle (degrees) toward player eyes.")]
+    public float upwardTiltAngle = 12.0f;
+
+    [Tooltip("Speed of smooth follow lerp.")]
+    public float followSpeed = 6.0f;
+
+    [Tooltip("Angular threshold in degrees before panel catches up.")]
+    public float deadzoneAngle = 18.0f;
+
+    [Header("Color Specifications (Exact Reference Palette)")]
+    public static readonly Color ColorChampagneGold = new Color(0.839f, 0.710f, 0.427f); // #D6B56D
+    public static readonly Color ColorWarmIvory     = new Color(1.000f, 0.973f, 0.906f); // #FFF8E7
+    public static readonly Color ColorPureWhite     = new Color(1.000f, 1.000f, 1.000f); // #FFFFFF
+    public static readonly Color ColorEmeraldGreen  = new Color(0.125f, 0.788f, 0.510f); // #20C982
+    public static readonly Color ColorWarmCharcoal  = new Color(0.105f, 0.095f, 0.085f, 0.96f); // Smoked-bronze charcoal
+    public static readonly Color ColorButtonBase    = new Color(0.140f, 0.125f, 0.110f, 0.98f); // Deep charcoal button fill
+
+    [Header("Destinations & Spawns")]
+    public Vector3 mainLobbySpawnPosition = new Vector3(0f, 0f, -10.0f);
+    public Vector3 mainLobbySpawnRotation = new Vector3(0f, 0f, 0f);
+
+    public Vector3 lab1SpawnPosition = new Vector3(0f, 0f, -41.0f);
+    public Vector3 lab1SpawnRotation = new Vector3(0f, 180f, 0f);
+
+    public Vector3 lab2SpawnPosition = new Vector3(-41.8f, 0f, 0f);
+    public Vector3 lab2SpawnRotation = new Vector3(0f, -90f, 0f);
+
+    public Vector3 lab3SpawnPosition = new Vector3(41.8f, 0f, 0f);
+    public Vector3 lab3SpawnRotation = new Vector3(0f, 90f, 0f);
+
+    // State (hidden by default on startup so hub and START LAB button are clearly visible)
+    private bool isPanelVisible = false;
+    public bool IsPanelVisible => isPanelVisible;
+    private GameObject panelRoot;
+    private LineRenderer interactionRayRenderer;
+    private GameObject rayReticleDot;
+    private TMP_FontAsset sharedFontAsset;
+
+    public enum DestinationRoom
+    {
+        MainLobby,
+        Lab1_FirstLaw,
+        Lab2_SecondLaw,
+        Lab3_ThirdLaw
+    }
+
+    private DestinationRoom currentActiveRoom = DestinationRoom.MainLobby;
+
+    private class DestinationButton
+    {
+        public DestinationRoom room;
+        public GameObject buttonObj;
+        public Renderer buttonRenderer;
+        public Renderer frameRenderer;
+        public Renderer emeraldIndicatorRenderer;
+        public TextMeshPro headingTmp;
+        public TextMeshPro descriptionTmp;
+        public TextMeshPro arrowTmp;
+        public Material defaultMat;
+        public Material hoverMat;
+        public Material activeMat;
+        public Material pressedMat;
+        public Vector3 baseLocalPos;
+        public Vector3 baseLocalScale;
+        public Action onClick;
+        public bool isHovered;
+    }
+
+    private List<DestinationButton> buttons = new List<DestinationButton>();
+    private DestinationButton hideButton;
+    private DestinationButton hoveredButton = null;
+
+    // Quest Double-Pinch Tracking State
+    private float lastLeftPinchTime = -1f;
+    private bool leftPinchWasActive = false;
+    private float lastRightPinchTime = -1f;
+    private bool rightPinchWasActive = false;
+    private const float DoublePinchWindow = 0.42f; // 420ms maximum gap between pinches
+
+    // Controller & Hand Selection State
+    private bool selectionActionWasActive = false;
+    private bool laptopToggleWasActive = false;
+    private bool prevLeftMenu = false;
+    private bool prevLeftY = false;
+    private bool prevLeftX = false;
+    private float lastPanelToggleTime = -1f;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    private static void AutoInitialize()
+    {
+        if (FindFirstObjectByType<FloatingVRDestinationPanel>() == null)
+        {
+            GameObject sys = new GameObject("FloatingVRDestinationPanel_System");
+            sys.AddComponent<FloatingVRDestinationPanel>();
+            Debug.Log("[Newton VR] Premium Champagne-Gold VR Destination Panel initialized automatically.");
+        }
+    }
+
+    void Awake()
+    {
+        FindRigReferences();
+        LoadFontAsset();
+        BuildLuxuryPanel();
+        SetupInteractionRay();
+    }
+
+    void Start()
+    {
+        // Suppress any legacy basic cube menu from VRTeleportController
+        VRTeleportController vtc = FindFirstObjectByType<VRTeleportController>();
+        if (vtc != null)
+        {
+            Transform oldMenu = vtc.transform.Find("VR_DestinationMenu");
+            if (oldMenu != null) oldMenu.gameObject.SetActive(false);
+        }
+
+        // Start panel docked/hidden so initial Hub view and START LAB button are unobstructed
+        SetPanelVisibility(false);
+        RefreshActiveRoomVisuals();
+    }
+
+    private void FindRigReferences()
+    {
+        if (characterController == null) characterController = FindFirstObjectByType<CharacterController>();
+
+        if (playerCamera == null)
+        {
+            Camera main = Camera.main;
+            if (main != null) playerCamera = main;
+            else playerCamera = FindFirstObjectByType<Camera>();
+        }
+
+        if (rightHandController == null || leftHandController == null)
+        {
+            PlayerController pc = FindFirstObjectByType<PlayerController>();
+            if (pc != null)
+            {
+                if (rightHandController == null) rightHandController = pc.rightHandController;
+                if (leftHandController == null) leftHandController = pc.leftHandController;
+            }
+        }
+    }
+
+    private void LoadFontAsset()
+    {
+        sharedFontAsset = Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
+        if (sharedFontAsset == null)
+        {
+            // Fallback: search anywhere in Resources
+            TMP_FontAsset[] fonts = Resources.FindObjectsOfTypeAll<TMP_FontAsset>();
+            if (fonts != null && fonts.Length > 0)
+            {
+                sharedFontAsset = fonts[0];
+            }
+        }
+    }
+
+    private void BuildLuxuryPanel()
+    {
+        panelRoot = new GameObject("VR_Floating3DPanel");
+        panelRoot.transform.SetParent(transform, true);
+
+        Shader stdShader = Shader.Find("Standard");
+        if (stdShader == null) stdShader = Shader.Find("Unlit/Color");
+
+        // 1. Backplate: Warm Charcoal with Smoked-Bronze Glass Finish
+        GameObject backplate = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        backplate.name = "Panel_Backplate";
+        backplate.transform.SetParent(panelRoot.transform, false);
+        backplate.transform.localPosition = Vector3.zero;
+        backplate.transform.localScale = new Vector3(1.28f, 0.96f, 0.025f);
+        Collider bc = backplate.GetComponent<Collider>();
+        if (bc) Destroy(bc);
+
+        Material backMat = new Material(stdShader) { hideFlags = HideFlags.HideAndDontSave };
+        backMat.color = ColorWarmCharcoal;
+        backMat.SetFloat("_Metallic", 0.40f);
+        backMat.SetFloat("_Glossiness", 0.80f);
+        backplate.GetComponent<MeshRenderer>().sharedMaterial = backMat;
+
+        // 2. Elegant Metallic Champagne Gold Glowing Border
+        GameObject bezel = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        bezel.name = "Panel_GoldBorder";
+        bezel.transform.SetParent(panelRoot.transform, false);
+        bezel.transform.localPosition = new Vector3(0f, 0f, -0.002f);
+        bezel.transform.localScale = new Vector3(1.31f, 0.99f, 0.015f);
+        Collider bzc = bezel.GetComponent<Collider>();
+        if (bzc) Destroy(bzc);
+
+        Material bezelMat = new Material(stdShader) { hideFlags = HideFlags.HideAndDontSave };
+        bezelMat.color = ColorChampagneGold;
+        bezelMat.SetFloat("_Metallic", 0.90f);
+        bezelMat.SetFloat("_Glossiness", 0.85f);
+        bezelMat.EnableKeyword("_EMISSION");
+        bezelMat.SetColor("_EmissionColor", ColorChampagneGold * 0.75f);
+        bezel.GetComponent<MeshRenderer>().sharedMaterial = bezelMat;
+
+        // 3. Atom Icon beside Main Heading (Golden Nucleus + Procedural Orbit Rings)
+        CreateAtomIcon(new Vector3(-0.46f, 0.38f, -0.024f));
+
+        // 4. Panel Header (TextMeshPro)
+        GameObject headerObj = new GameObject("Panel_Header_TMP");
+        headerObj.transform.SetParent(panelRoot.transform, false);
+        headerObj.transform.localPosition = new Vector3(0.04f, 0.385f, -0.024f);
+
+        TextMeshPro headerTmp = headerObj.AddComponent<TextMeshPro>();
+        if (sharedFontAsset != null) headerTmp.font = sharedFontAsset;
+        headerTmp.text = "NEWTONIAN VR LABORATORY";
+        headerTmp.fontSize = 4.2f;
+        headerTmp.fontStyle = FontStyles.Bold;
+        headerTmp.alignment = TextAlignmentOptions.Midline;
+        headerTmp.color = ColorPureWhite;
+        headerTmp.rectTransform.sizeDelta = new Vector2(0.85f, 0.10f);
+
+        // Subtitle (TextMeshPro)
+        GameObject subObj = new GameObject("Panel_Subtitle_TMP");
+        subObj.transform.SetParent(panelRoot.transform, false);
+        subObj.transform.localPosition = new Vector3(0.04f, 0.315f, -0.024f);
+
+        TextMeshPro subTmp = subObj.AddComponent<TextMeshPro>();
+        if (sharedFontAsset != null) subTmp.font = sharedFontAsset;
+        subTmp.text = "SELECT A ROOM TO EXPLORE";
+        subTmp.fontSize = 2.4f;
+        subTmp.fontStyle = FontStyles.Normal;
+        subTmp.alignment = TextAlignmentOptions.Midline;
+        subTmp.color = ColorChampagneGold;
+        subTmp.rectTransform.sizeDelta = new Vector2(0.85f, 0.08f);
+
+        // 5. Four Destination Buttons with Exact User Text
+        // Button 1: Main Lobby
+        CreateLuxuryDestinationButton(
+            DestinationRoom.MainLobby,
+            "MAIN LOBBY",
+            "Return to the Central Exhibition Hall",
+            new Vector3(0f, 0.165f, -0.025f),
+            () => TeleportTo(mainLobbySpawnPosition, Quaternion.Euler(mainLobbySpawnRotation), DestinationRoom.MainLobby, "Main Lobby")
+        );
+
+        // Button 2: Room 1 — Newton's First Law
+        CreateLuxuryDestinationButton(
+            DestinationRoom.Lab1_FirstLaw,
+            "ROOM 1 — NEWTON'S FIRST LAW",
+            "Inertia and Motion",
+            new Vector3(0f, 0.030f, -0.025f),
+            () => TeleportTo(lab1SpawnPosition, Quaternion.Euler(lab1SpawnRotation), DestinationRoom.Lab1_FirstLaw, "Room 1 (First Law)")
+        );
+
+        // Button 3: Room 2 — Newton's Second Law
+        CreateLuxuryDestinationButton(
+            DestinationRoom.Lab2_SecondLaw,
+            "ROOM 2 — NEWTON'S SECOND LAW",
+            "Force, Mass and Acceleration",
+            new Vector3(0f, -0.105f, -0.025f),
+            () => TeleportTo(lab2SpawnPosition, Quaternion.Euler(lab2SpawnRotation), DestinationRoom.Lab2_SecondLaw, "Room 2 (Second Law)")
+        );
+
+        // Button 4: Room 3 — Newton's Third Law
+        CreateLuxuryDestinationButton(
+            DestinationRoom.Lab3_ThirdLaw,
+            "ROOM 3 — NEWTON'S THIRD LAW",
+            "Action and Reaction",
+            new Vector3(0f, -0.240f, -0.025f),
+            () => TeleportTo(lab3SpawnPosition, Quaternion.Euler(lab3SpawnRotation), DestinationRoom.Lab3_ThirdLaw, "Room 3 (Third Law)")
+        );
+
+        // Button 5: Replay Narration
+        CreateReplayButton(new Vector3(0f, -0.370f, -0.025f));
+
+        // 6. Upper-Right Close Button
+        CreateCloseButton(new Vector3(0.53f, 0.385f, -0.025f));
+    }
+
+    private void CreateReplayButton(Vector3 localPos)
+    {
+        GameObject btnObj = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        btnObj.name = "Btn_ReplayNarration";
+        btnObj.transform.SetParent(panelRoot.transform, false);
+        btnObj.transform.localPosition = localPos;
+        btnObj.transform.localScale = new Vector3(0.65f, 0.085f, 0.02f);
+
+        Shader stdShader = Shader.Find("Standard");
+        Material defMat = new Material(stdShader) { hideFlags = HideFlags.HideAndDontSave };
+        defMat.color = new Color(0.12f, 0.16f, 0.20f);
+        defMat.SetFloat("_Metallic", 0.70f);
+        defMat.SetFloat("_Glossiness", 0.80f);
+        defMat.EnableKeyword("_EMISSION");
+        defMat.SetColor("_EmissionColor", new Color(0.1f, 0.35f, 0.5f) * 0.5f);
+
+        Material hovMat = new Material(stdShader) { hideFlags = HideFlags.HideAndDontSave };
+        hovMat.color = new Color(0.18f, 0.26f, 0.32f);
+        hovMat.EnableKeyword("_EMISSION");
+        hovMat.SetColor("_EmissionColor", new Color(0.2f, 0.7f, 1f) * 1.3f);
+
+        Material prsMat = new Material(stdShader) { hideFlags = HideFlags.HideAndDontSave };
+        prsMat.color = Color.white;
+        prsMat.EnableKeyword("_EMISSION");
+        prsMat.SetColor("_EmissionColor", new Color(0.2f, 0.9f, 1f) * 2.2f);
+
+        Renderer r = btnObj.GetComponent<Renderer>();
+        r.sharedMaterial = defMat;
+
+        GameObject textObj = new GameObject("TMP_Replay");
+        textObj.transform.SetParent(btnObj.transform, false);
+        textObj.transform.localPosition = new Vector3(0f, 0f, -0.60f);
+
+        TextMeshPro tm = textObj.AddComponent<TextMeshPro>();
+        if (sharedFontAsset != null) tm.font = sharedFontAsset;
+        tm.text = "🔊 REPLAY NARRATION";
+        tm.fontSize = 2.4f;
+        tm.fontStyle = FontStyles.Bold;
+        tm.alignment = TextAlignmentOptions.Midline;
+        tm.color = ColorPureWhite;
+        tm.rectTransform.sizeDelta = new Vector2(0.65f, 0.085f);
+
+        DestinationButton replayBtn = new DestinationButton
+        {
+            room = (DestinationRoom)(-2),
+            buttonObj = btnObj,
+            buttonRenderer = r,
+            frameRenderer = null,
+            emeraldIndicatorRenderer = null,
+            headingTmp = tm,
+            descriptionTmp = null,
+            arrowTmp = null,
+            defaultMat = defMat,
+            hoverMat = hovMat,
+            activeMat = defMat,
+            pressedMat = prsMat,
+            baseLocalPos = localPos,
+            baseLocalScale = btnObj.transform.localScale,
+            onClick = () => {
+                if (NarrationManager.Instance != null)
+                {
+                    NarrationManager.Instance.ReplayCurrentStation();
+                }
+            },
+            isHovered = false
+        };
+
+        buttons.Add(replayBtn);
+    }
+
+    /// <summary>
+    /// Creates the elegant golden atom icon beside the main header.
+    /// </summary>
+    private void CreateAtomIcon(Vector3 localPos)
+    {
+        GameObject atomRoot = new GameObject("Icon_Atom");
+        atomRoot.transform.SetParent(panelRoot.transform, false);
+        atomRoot.transform.localPosition = localPos;
+        atomRoot.transform.localRotation = Quaternion.Euler(0f, 0f, 0f);
+
+        Shader stdShader = Shader.Find("Standard");
+
+        Material goldEmissiveMat = new Material(stdShader) { hideFlags = HideFlags.HideAndDontSave };
+        goldEmissiveMat.color = ColorChampagneGold;
+        goldEmissiveMat.SetFloat("_Metallic", 0.90f);
+        goldEmissiveMat.SetFloat("_Glossiness", 0.85f);
+        goldEmissiveMat.EnableKeyword("_EMISSION");
+        goldEmissiveMat.SetColor("_EmissionColor", ColorChampagneGold * 1.6f);
+
+        // Central Nucleus
+        GameObject nucleus = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        nucleus.name = "Atom_Nucleus";
+        nucleus.transform.SetParent(atomRoot.transform, false);
+        nucleus.transform.localPosition = Vector3.zero;
+        nucleus.transform.localScale = Vector3.one * 0.028f;
+        Collider nc = nucleus.GetComponent<Collider>();
+        if (nc) Destroy(nc);
+        nucleus.GetComponent<MeshRenderer>().sharedMaterial = goldEmissiveMat;
+
+        // 3 Tilted Orbit Rings (Cylinder Discs with inner hole effect)
+        float[] tiltAngles = new float[] { 0f, 60f, -60f };
+        for (int i = 0; i < tiltAngles.Length; i++)
+        {
+            GameObject ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            ring.name = $"Atom_Orbit_{i}";
+            ring.transform.SetParent(atomRoot.transform, false);
+            ring.transform.localPosition = Vector3.zero;
+            ring.transform.localRotation = Quaternion.Euler(0f, 0f, tiltAngles[i]);
+            ring.transform.localScale = new Vector3(0.080f, 0.0015f, 0.038f);
+            Collider rc = ring.GetComponent<Collider>();
+            if (rc) Destroy(rc);
+            ring.GetComponent<MeshRenderer>().sharedMaterial = goldEmissiveMat;
+        }
+    }
+
+    private void CreateLuxuryDestinationButton(DestinationRoom roomType, string heading, string description, Vector3 localPos, Action onClickAction)
+    {
+        // 1. Button Base Container & Collider
+        GameObject btnObj = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        btnObj.name = $"Btn_{heading.Replace(" ", "").Replace("—", "").Replace("'", "")}";
+        btnObj.transform.SetParent(panelRoot.transform, false);
+        btnObj.transform.localPosition = localPos;
+        btnObj.transform.localScale = new Vector3(1.10f, 0.118f, 0.025f);
+
+        Shader stdShader = Shader.Find("Standard");
+
+        // Button Base: Smoked Charcoal-Bronze Glass
+        Material defMat = new Material(stdShader) { hideFlags = HideFlags.HideAndDontSave };
+        defMat.color = ColorButtonBase;
+        defMat.SetFloat("_Metallic", 0.55f);
+        defMat.SetFloat("_Glossiness", 0.75f);
+        defMat.EnableKeyword("_EMISSION");
+        defMat.SetColor("_EmissionColor", ColorChampagneGold * 0.25f);
+
+        // Hover Material: Soft Warm Gold Illumination
+        Material hovMat = new Material(stdShader) { hideFlags = HideFlags.HideAndDontSave };
+        hovMat.color = new Color(0.24f, 0.20f, 0.15f);
+        hovMat.SetFloat("_Metallic", 0.75f);
+        hovMat.SetFloat("_Glossiness", 0.85f);
+        hovMat.EnableKeyword("_EMISSION");
+        hovMat.SetColor("_EmissionColor", ColorChampagneGold * 1.40f);
+
+        // Active Room Material: Bright Emerald-Green Glow
+        Material actMat = new Material(stdShader) { hideFlags = HideFlags.HideAndDontSave };
+        actMat.color = new Color(0.08f, 0.22f, 0.15f);
+        actMat.SetFloat("_Metallic", 0.70f);
+        actMat.SetFloat("_Glossiness", 0.85f);
+        actMat.EnableKeyword("_EMISSION");
+        actMat.SetColor("_EmissionColor", ColorEmeraldGreen * 1.50f);
+
+        // Pressed Material: Vibrant Emerald Pulse
+        Material prsMat = new Material(stdShader) { hideFlags = HideFlags.HideAndDontSave };
+        prsMat.color = Color.white;
+        prsMat.EnableKeyword("_EMISSION");
+        prsMat.SetColor("_EmissionColor", ColorEmeraldGreen * 2.5f);
+
+        Renderer r = btnObj.GetComponent<Renderer>();
+        r.sharedMaterial = defMat;
+
+        // 2. Elegant Champagne Gold Outer Bevel Frame
+        GameObject frameObj = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        frameObj.name = "Frame_Gold";
+        frameObj.transform.SetParent(btnObj.transform, false);
+        frameObj.transform.localPosition = new Vector3(0f, 0f, 0.003f);
+        frameObj.transform.localScale = new Vector3(1.025f, 1.12f, 0.85f);
+        Collider fc = frameObj.GetComponent<Collider>();
+        if (fc) Destroy(fc);
+
+        Material frameMat = new Material(stdShader) { hideFlags = HideFlags.HideAndDontSave };
+        frameMat.color = ColorChampagneGold;
+        frameMat.SetFloat("_Metallic", 0.85f);
+        frameMat.SetFloat("_Glossiness", 0.80f);
+        frameMat.EnableKeyword("_EMISSION");
+        frameMat.SetColor("_EmissionColor", ColorChampagneGold * 0.40f);
+        Renderer frameRen = frameObj.GetComponent<Renderer>();
+        frameRen.sharedMaterial = frameMat;
+
+        // 3. Left Vertical Emerald-Green Accent Bar
+        GameObject emeraldBadge = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        emeraldBadge.name = "Badge_Emerald";
+        emeraldBadge.transform.SetParent(btnObj.transform, false);
+        emeraldBadge.transform.localPosition = new Vector3(-0.475f, 0f, -0.55f);
+        emeraldBadge.transform.localScale = new Vector3(0.018f, 0.75f, 0.25f);
+        Collider ebc = emeraldBadge.GetComponent<Collider>();
+        if (ebc) Destroy(ebc);
+
+        Material badgeMat = new Material(stdShader) { hideFlags = HideFlags.HideAndDontSave };
+        badgeMat.color = ColorEmeraldGreen;
+        badgeMat.EnableKeyword("_EMISSION");
+        badgeMat.SetColor("_EmissionColor", ColorEmeraldGreen * 1.6f);
+        Renderer badgeRen = emeraldBadge.GetComponent<Renderer>();
+        badgeRen.sharedMaterial = badgeMat;
+
+        // 4. Large, Bold, Pure White Heading (TextMeshPro)
+        GameObject headObj = new GameObject("TMP_Heading");
+        headObj.transform.SetParent(btnObj.transform, false);
+        headObj.transform.localPosition = new Vector3(-0.02f, 0.15f, -0.60f);
+
+        TextMeshPro headTmp = headObj.AddComponent<TextMeshPro>();
+        if (sharedFontAsset != null) headTmp.font = sharedFontAsset;
+        headTmp.text = heading;
+        headTmp.fontSize = 3.3f;
+        headTmp.fontStyle = FontStyles.Bold;
+        headTmp.alignment = TextAlignmentOptions.MidlineLeft;
+        headTmp.color = ColorPureWhite; // PURE WHITE #FFFFFF
+        headTmp.rectTransform.sizeDelta = new Vector2(0.86f, 0.06f);
+
+        // 5. White or Warm Ivory Description (TextMeshPro)
+        GameObject descObj = new GameObject("TMP_Description");
+        descObj.transform.SetParent(btnObj.transform, false);
+        descObj.transform.localPosition = new Vector3(-0.02f, -0.16f, -0.60f);
+
+        TextMeshPro descTmp = descObj.AddComponent<TextMeshPro>();
+        if (sharedFontAsset != null) descTmp.font = sharedFontAsset;
+        descTmp.text = description;
+        descTmp.fontSize = 2.4f;
+        descTmp.fontStyle = FontStyles.Normal;
+        descTmp.alignment = TextAlignmentOptions.MidlineLeft;
+        descTmp.color = ColorWarmIvory; // WARM IVORY #FFF8E7
+        descTmp.rectTransform.sizeDelta = new Vector2(0.86f, 0.05f);
+
+        // 6. Right Champagne Gold Arrow Indicator (TextMeshPro)
+        GameObject arrowObj = new GameObject("TMP_GoldArrow");
+        arrowObj.transform.SetParent(btnObj.transform, false);
+        arrowObj.transform.localPosition = new Vector3(0.44f, 0f, -0.60f);
+
+        TextMeshPro arrowTmp = arrowObj.AddComponent<TextMeshPro>();
+        if (sharedFontAsset != null) arrowTmp.font = sharedFontAsset;
+        arrowTmp.text = "▶";
+        arrowTmp.fontSize = 2.8f;
+        arrowTmp.fontStyle = FontStyles.Bold;
+        arrowTmp.alignment = TextAlignmentOptions.Midline;
+        arrowTmp.color = ColorChampagneGold;
+        arrowTmp.rectTransform.sizeDelta = new Vector2(0.10f, 0.08f);
+
+        DestinationButton btnData = new DestinationButton
+        {
+            room = roomType,
+            buttonObj = btnObj,
+            buttonRenderer = r,
+            frameRenderer = frameRen,
+            emeraldIndicatorRenderer = badgeRen,
+            headingTmp = headTmp,
+            descriptionTmp = descTmp,
+            arrowTmp = arrowTmp,
+            defaultMat = defMat,
+            hoverMat = hovMat,
+            activeMat = actMat,
+            pressedMat = prsMat,
+            baseLocalPos = localPos,
+            baseLocalScale = btnObj.transform.localScale,
+            onClick = onClickAction,
+            isHovered = false
+        };
+
+        buttons.Add(btnData);
+    }
+
+    private void CreateCloseButton(Vector3 localPos)
+    {
+        GameObject btnObj = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        btnObj.name = "Btn_Close";
+        btnObj.transform.SetParent(panelRoot.transform, false);
+        btnObj.transform.localPosition = localPos;
+        btnObj.transform.localScale = new Vector3(0.12f, 0.065f, 0.02f);
+
+        Shader stdShader = Shader.Find("Standard");
+        Material defMat = new Material(stdShader) { hideFlags = HideFlags.HideAndDontSave };
+        defMat.color = new Color(0.16f, 0.14f, 0.12f);
+        defMat.SetFloat("_Metallic", 0.85f);
+        defMat.SetFloat("_Glossiness", 0.80f);
+        defMat.EnableKeyword("_EMISSION");
+        defMat.SetColor("_EmissionColor", ColorChampagneGold * 0.45f);
+
+        Material hovMat = new Material(stdShader) { hideFlags = HideFlags.HideAndDontSave };
+        hovMat.color = new Color(0.28f, 0.24f, 0.18f);
+        hovMat.EnableKeyword("_EMISSION");
+        hovMat.SetColor("_EmissionColor", ColorChampagneGold * 1.50f);
+
+        Material prsMat = new Material(stdShader) { hideFlags = HideFlags.HideAndDontSave };
+        prsMat.color = Color.white;
+        prsMat.EnableKeyword("_EMISSION");
+        prsMat.SetColor("_EmissionColor", ColorEmeraldGreen * 2.0f);
+
+        Renderer r = btnObj.GetComponent<Renderer>();
+        r.sharedMaterial = defMat;
+
+        // Close Icon Text (TextMeshPro): Pure White ✕
+        GameObject textObj = new GameObject("TMP_Close");
+        textObj.transform.SetParent(btnObj.transform, false);
+        textObj.transform.localPosition = new Vector3(0f, 0f, -0.60f);
+
+        TextMeshPro tm = textObj.AddComponent<TextMeshPro>();
+        if (sharedFontAsset != null) tm.font = sharedFontAsset;
+        tm.text = "✕";
+        tm.fontSize = 3.6f;
+        tm.fontStyle = FontStyles.Bold;
+        tm.alignment = TextAlignmentOptions.Midline;
+        tm.color = ColorPureWhite;
+        tm.rectTransform.sizeDelta = new Vector2(0.12f, 0.06f);
+
+        hideButton = new DestinationButton
+        {
+            room = (DestinationRoom)(-1),
+            buttonObj = btnObj,
+            buttonRenderer = r,
+            frameRenderer = null,
+            emeraldIndicatorRenderer = null,
+            headingTmp = tm,
+            descriptionTmp = null,
+            arrowTmp = null,
+            defaultMat = defMat,
+            hoverMat = hovMat,
+            activeMat = defMat,
+            pressedMat = prsMat,
+            baseLocalPos = localPos,
+            baseLocalScale = btnObj.transform.localScale,
+            onClick = () => SetPanelVisibility(false),
+            isHovered = false
+        };
+    }
+
+    private void SetupInteractionRay()
+    {
+        GameObject rayObj = new GameObject("VR_DestinationRay");
+        rayObj.transform.SetParent(transform, false);
+
+        interactionRayRenderer = rayObj.AddComponent<LineRenderer>();
+        interactionRayRenderer.useWorldSpace = true;
+        interactionRayRenderer.startWidth = 0.006f;
+        interactionRayRenderer.endWidth = 0.002f;
+        interactionRayRenderer.positionCount = 2;
+        interactionRayRenderer.enabled = false;
+
+        Material rayMat = new Material(Shader.Find("Sprites/Default"));
+        Color c = new Color(ColorChampagneGold.r, ColorChampagneGold.g, ColorChampagneGold.b, 0.75f);
+        rayMat.color = c;
+        interactionRayRenderer.material = rayMat;
+        interactionRayRenderer.startColor = c;
+        interactionRayRenderer.endColor = new Color(ColorEmeraldGreen.r, ColorEmeraldGreen.g, ColorEmeraldGreen.b, 0.15f);
+
+        // Reticle Dot: Glowing Emerald Green
+        rayReticleDot = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        rayReticleDot.name = "VR_DestinationRayReticle";
+        rayReticleDot.transform.SetParent(transform, false);
+        rayReticleDot.transform.localScale = Vector3.one * 0.024f;
+        Collider col = rayReticleDot.GetComponent<Collider>();
+        if (col) Destroy(col);
+
+        Material dotMat = new Material(Shader.Find("Standard"));
+        dotMat.color = ColorEmeraldGreen;
+        dotMat.EnableKeyword("_EMISSION");
+        dotMat.SetColor("_EmissionColor", ColorEmeraldGreen * 2.2f);
+        rayReticleDot.GetComponent<Renderer>().sharedMaterial = dotMat;
+        rayReticleDot.SetActive(false);
+    }
+
+    void Update()
+    {
+        HandleVisibilityToggleInputs();
+
+        if (isPanelVisible)
+        {
+            UpdateLazyFollow();
+            UpdateInteraction();
+        }
+        else
+        {
+            if (interactionRayRenderer != null) interactionRayRenderer.enabled = false;
+            if (rayReticleDot != null) rayReticleDot.SetActive(false);
+        }
+    }
+
+    /// <summary>
+    /// Handles panel open/close toggling:
+    /// - Meta Quest 3S: Double Pinch on either hand (Primary VR Hand Tracking).
+    /// - Meta Quest Controller: Secondary Button (B/Y/Menu).
+    /// - Laptop Testing: N Key ONLY.
+    /// </summary>
+    private void HandleVisibilityToggleInputs()
+    {
+        bool toggleTriggered = false;
+
+        // 1. Meta Quest 3S Hand Tracking: Double Pinch Gesture
+        if (CheckDoublePinchGesture(XRNode.LeftHand, ref lastLeftPinchTime, ref leftPinchWasActive))
+        {
+            toggleTriggered = true;
+            Debug.Log("[Newton VR] Left Hand Double Pinch: Toggle Navigation Panel");
+        }
+        else if (CheckDoublePinchGesture(XRNode.RightHand, ref lastRightPinchTime, ref rightPinchWasActive))
+        {
+            toggleTriggered = true;
+            Debug.Log("[Newton VR] Right Hand Double Pinch: Toggle Navigation Panel");
+        }
+
+        // 2. Meta Quest Touch Controller Button: Left Button X (Primary Button), Left Menu, or Left Y
+        XRInputDevice leftHand = XRInputDevices.GetDeviceAtXRNode(XRNode.LeftHand);
+        bool leftMenu = false;
+        bool leftY = false;
+        bool leftX = false;
+        if (leftHand.isValid)
+        {
+            leftHand.TryGetFeatureValue(XRCommonUsages.primaryButton, out leftX);
+            leftHand.TryGetFeatureValue(XRCommonUsages.menuButton, out leftMenu);
+            leftHand.TryGetFeatureValue(XRCommonUsages.secondaryButton, out leftY);
+        }
+
+#if ENABLE_INPUT_SYSTEM
+        if (!leftX)
+        {
+            foreach (var dev in InputSystem.devices)
+            {
+                if (!dev.added) continue;
+                bool isLeft = false;
+                for (int u = 0; u < dev.usages.Count; u++)
+                {
+                    if (dev.usages[u] == UnityEngine.InputSystem.CommonUsages.LeftHand) { isLeft = true; break; }
+                }
+                string devName = dev.name;
+                string devLayout = dev.layout;
+                if ((devName.IndexOf("left", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+                     devLayout.IndexOf("left", System.StringComparison.OrdinalIgnoreCase) >= 0) &&
+                    (devName.IndexOf("right", System.StringComparison.OrdinalIgnoreCase) < 0))
+                {
+                    isLeft = true;
+                }
+
+                if (isLeft)
+                {
+                    var xBtn = dev.GetChildControl<UnityEngine.InputSystem.Controls.ButtonControl>("primaryButton")
+                               ?? dev.GetChildControl<UnityEngine.InputSystem.Controls.ButtonControl>("buttonSouth")
+                               ?? dev.GetChildControl<UnityEngine.InputSystem.Controls.ButtonControl>("xButton");
+                    if (xBtn != null && xBtn.isPressed) { leftX = true; break; }
+                }
+            }
+        }
+#endif
+
+        if ((leftX && !prevLeftX) || (leftMenu && !prevLeftMenu) || (leftY && !prevLeftY))
+        {
+            toggleTriggered = true;
+        }
+        prevLeftX = leftX;
+        prevLeftMenu = leftMenu;
+        prevLeftY = leftY;
+
+        // 3. Laptop Keyboard Testing: Key N, Tab, or V
+        bool nPressedThisFrame = false;
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current != null && (Keyboard.current.nKey.wasPressedThisFrame || Keyboard.current.tabKey.wasPressedThisFrame || Keyboard.current.vKey.wasPressedThisFrame))
+        {
+            nPressedThisFrame = true;
+        }
+#endif
+        try
+        {
+            if (Input.GetKeyDown(KeyCode.N) || Input.GetKeyDown(KeyCode.Tab) || Input.GetKeyDown(KeyCode.V)) nPressedThisFrame = true;
+        }
+        catch { }
+
+        if (nPressedThisFrame && !laptopToggleWasActive)
+        {
+            toggleTriggered = true;
+            Debug.Log("[Newton VR] Laptop Key: Toggle Navigation Panel");
+        }
+        laptopToggleWasActive = nPressedThisFrame;
+
+        if (toggleTriggered)
+        {
+            TogglePanel();
+        }
+    }
+
+    public void TogglePanel()
+    {
+        if (Time.unscaledTime - lastPanelToggleTime < 0.25f) return;
+        lastPanelToggleTime = Time.unscaledTime;
+        SetPanelVisibility(!isPanelVisible);
+        if (isPanelVisible) SnapToPlayerFront();
+    }
+
+    public void SetCurrentActiveRoom(int roomIndex)
+    {
+        currentActiveRoom = (DestinationRoom)Mathf.Clamp(roomIndex, 0, 3);
+        RefreshActiveRoomVisuals();
+    }
+
+    /// <summary>
+    /// Detects consecutive pinches within DoublePinchWindow (420ms).
+    /// </summary>
+    private bool CheckDoublePinchGesture(XRNode node, ref float lastPinchTime, ref bool wasPinching)
+    {
+        XRInputDevice device = XRInputDevices.GetDeviceAtXRNode(node);
+        if (!device.isValid) return false;
+
+        // Physical controllers must not trigger bare-hand double pinch gestures
+        if ((device.characteristics & UnityEngine.XR.InputDeviceCharacteristics.Controller) != 0) return false;
+
+        bool isPinching = false;
+        if (device.TryGetFeatureValue(XRCommonUsages.trigger, out float tVal) && tVal > 0.65f) isPinching = true;
+        if (device.TryGetFeatureValue(XRCommonUsages.triggerButton, out bool tBtn) && tBtn) isPinching = true;
+
+        bool doublePinchOccurred = false;
+
+        // Detect transition from not-pinching to pinching
+        if (isPinching && !wasPinching)
+        {
+            float now = Time.unscaledTime;
+            if (lastPinchTime > 0f && (now - lastPinchTime) <= DoublePinchWindow)
+            {
+                doublePinchOccurred = true;
+                lastPinchTime = -1f; // Consume double pinch
+            }
+            else
+            {
+                lastPinchTime = now;
+            }
+        }
+
+        wasPinching = isPinching;
+        return doublePinchOccurred;
+    }
+
+    public void SetPanelVisibility(bool visible)
+    {
+        isPanelVisible = visible;
+        if (panelRoot != null) panelRoot.SetActive(visible);
+        if (!visible)
+        {
+            if (interactionRayRenderer != null) interactionRayRenderer.enabled = false;
+            if (rayReticleDot != null) rayReticleDot.SetActive(false);
+        }
+    }
+
+    public void SnapToPlayerFront()
+    {
+        if (playerCamera == null) FindRigReferences();
+        if (playerCamera == null || panelRoot == null) return;
+
+        Vector3 headPos = playerCamera.transform.position;
+        Vector3 headFwd = playerCamera.transform.forward;
+        headFwd.y = 0f;
+        if (headFwd.sqrMagnitude < 0.01f) headFwd = transform.forward;
+        headFwd.Normalize();
+
+        Vector3 targetPos = headPos + headFwd * followDistance + Vector3.up * verticalOffset;
+        Quaternion targetRot = Quaternion.LookRotation(headFwd) * Quaternion.Euler(upwardTiltAngle, 0f, 0f);
+
+        panelRoot.transform.position = targetPos;
+        panelRoot.transform.rotation = targetRot;
+    }
+
+    private void UpdateLazyFollow()
+    {
+        if (playerCamera == null || panelRoot == null) return;
+
+        Vector3 headPos = playerCamera.transform.position;
+        Vector3 headFwd = playerCamera.transform.forward;
+        headFwd.y = 0f;
+        if (headFwd.sqrMagnitude < 0.01f) headFwd = Vector3.forward;
+        headFwd.Normalize();
+
+        Vector3 targetPos = headPos + headFwd * followDistance + Vector3.up * verticalOffset;
+        Quaternion targetRot = Quaternion.LookRotation(headFwd) * Quaternion.Euler(upwardTiltAngle, 0f, 0f);
+
+        // Check angle between current panel direction and head forward
+        Vector3 toCurrentPanel = (panelRoot.transform.position - headPos).normalized;
+        toCurrentPanel.y = 0f;
+        float angleDiff = Vector3.Angle(headFwd, toCurrentPanel);
+
+        // If outside deadzone or distance moved significantly, smoothly glide into view
+        float distDiff = Vector3.Distance(panelRoot.transform.position, targetPos);
+        if (angleDiff > deadzoneAngle || distDiff > 0.45f)
+        {
+            panelRoot.transform.position = Vector3.Lerp(panelRoot.transform.position, targetPos, Time.deltaTime * followSpeed);
+            panelRoot.transform.rotation = Quaternion.Slerp(panelRoot.transform.rotation, targetRot, Time.deltaTime * followSpeed);
+        }
+    }
+
+    /// <summary>
+    /// Handles destination selection:
+    /// - Meta Quest 3S Hand Tracking: Hand ray + index pinch on destination.
+    /// - Meta Quest Controller: Controller ray + trigger press.
+    /// - Laptop Testing: Mouse hover + Left-Click.
+    /// </summary>
+    private void UpdateInteraction()
+    {
+        Ray ray = default;
+        bool hasRay = false;
+        bool selectionRequested = false;
+        bool isVR = true;
+
+        // 1. Ray Targeting: Check right hand controller ray, or camera gaze ray
+        if (rightHandController != null)
+        {
+            Ray rRay = new Ray(rightHandController.position, rightHandController.forward);
+            foreach (var b in buttons)
+            {
+                if (b.buttonObj != null)
+                {
+                    Collider col = b.buttonObj.GetComponent<Collider>();
+                    if (col != null && col.Raycast(rRay, out RaycastHit _, 10.0f))
+                    {
+                        ray = rRay;
+                        hasRay = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (!hasRay && playerCamera != null)
+        {
+            if (Cursor.lockState == CursorLockMode.None && !UnityEngine.XR.XRSettings.isDeviceActive)
+            {
+                ray = playerCamera.ScreenPointToRay(Input.mousePosition);
+            }
+            else
+            {
+                ray = new Ray(playerCamera.transform.position, playerCamera.transform.forward);
+            }
+            hasRay = true;
+        }
+
+        if (!hasRay)
+        {
+            if (rightHandController != null) ray = new Ray(rightHandController.position, rightHandController.forward);
+            else if (playerCamera != null) ray = new Ray(playerCamera.transform.position, playerCamera.transform.forward);
+            else return;
+        }
+
+        // 2. Selection Trigger Input across all pipelines
+        XRInputDevice rightHand = XRInputDevices.GetDeviceAtXRNode(XRNode.RightHand);
+        if (rightHand.isValid)
+        {
+            if (rightHand.TryGetFeatureValue(XRCommonUsages.trigger, out float tVal) && tVal > 0.35f) selectionRequested = true;
+            if (rightHand.TryGetFeatureValue(XRCommonUsages.triggerButton, out bool tBtn) && tBtn) selectionRequested = true;
+            if (rightHand.TryGetFeatureValue(XRCommonUsages.primaryButton, out bool pBtn) && pBtn) selectionRequested = true;
+        }
+
+#if ENABLE_INPUT_SYSTEM
+        if (Gamepad.current != null)
+        {
+            if (Gamepad.current.rightTrigger.isPressed || Gamepad.current.aButton.isPressed) selectionRequested = true;
+        }
+        foreach (var dev in InputSystem.devices)
+        {
+            if (!dev.added) continue;
+            var trigBtn = dev.GetChildControl<UnityEngine.InputSystem.Controls.ButtonControl>("triggerPressed")
+                          ?? dev.GetChildControl<UnityEngine.InputSystem.Controls.ButtonControl>("triggerButton")
+                          ?? dev.GetChildControl<UnityEngine.InputSystem.Controls.ButtonControl>("primaryButton");
+            if (trigBtn != null && trigBtn.isPressed) { selectionRequested = true; break; }
+        }
+#endif
+
+        try
+        {
+            if (Input.GetMouseButton(0) || Input.GetKey(KeyCode.E) || Input.GetKey(KeyCode.JoystickButton0))
+                selectionRequested = true;
+        }
+        catch { }
+
+        bool selectClickThisFrame = selectionRequested && !selectionActionWasActive;
+        selectionActionWasActive = selectionRequested;
+
+        // Raycast against all buttons
+        DestinationButton hitBtn = null;
+        RaycastHit hitInfo = default;
+        float closestDist = float.MaxValue;
+
+        // Check destination buttons
+        foreach (var b in buttons)
+        {
+            if (b.buttonObj == null) continue;
+            Collider col = b.buttonObj.GetComponent<Collider>();
+            if (col != null && col.Raycast(ray, out RaycastHit hit, 10.0f))
+            {
+                if (hit.distance < closestDist)
+                {
+                    closestDist = hit.distance;
+                    hitBtn = b;
+                    hitInfo = hit;
+                }
+            }
+        }
+
+        // Check hide button
+        if (hideButton != null && hideButton.buttonObj != null)
+        {
+            Collider hc = hideButton.buttonObj.GetComponent<Collider>();
+            if (hc != null && hc.Raycast(ray, out RaycastHit hHit, 10.0f))
+            {
+                if (hHit.distance < closestDist)
+                {
+                    closestDist = hHit.distance;
+                    hitBtn = hideButton;
+                    hitInfo = hHit;
+                }
+            }
+        }
+
+        // Visual Pointer Ray: Soft Champagne Gold to Emerald Reticle
+        if (interactionRayRenderer != null)
+        {
+            if (isVR || hitBtn != null)
+            {
+                interactionRayRenderer.enabled = true;
+                Vector3 startPos = ray.origin;
+                Vector3 endPos = (hitBtn != null) ? hitInfo.point : (ray.origin + ray.direction * 2.5f);
+                interactionRayRenderer.SetPosition(0, startPos);
+                interactionRayRenderer.SetPosition(1, endPos);
+            }
+            else
+            {
+                interactionRayRenderer.enabled = false;
+            }
+        }
+
+        if (rayReticleDot != null)
+        {
+            if (hitBtn != null)
+            {
+                rayReticleDot.SetActive(true);
+                rayReticleDot.transform.position = hitInfo.point + hitInfo.normal * 0.005f;
+                rayReticleDot.transform.rotation = Quaternion.LookRotation(hitInfo.normal);
+            }
+            else
+            {
+                rayReticleDot.SetActive(false);
+            }
+        }
+
+        // Hover feedback
+        if (hitBtn != hoveredButton)
+        {
+            if (hoveredButton != null) ResetButtonVisual(hoveredButton);
+            hoveredButton = hitBtn;
+            if (hoveredButton != null) SetButtonHover(hoveredButton);
+        }
+
+        // Click selection
+        if (hoveredButton != null && selectClickThisFrame)
+        {
+            StartCoroutine(AnimateButtonClick(hoveredButton));
+            hoveredButton.onClick?.Invoke();
+        }
+    }
+
+    private void SetButtonHover(DestinationButton b)
+    {
+        if (b.buttonRenderer != null && b.hoverMat != null)
+        {
+            b.buttonRenderer.sharedMaterial = b.hoverMat;
+        }
+        b.buttonObj.transform.localPosition = b.baseLocalPos + new Vector3(0f, 0f, -0.012f);
+        b.buttonObj.transform.localScale = b.baseLocalScale * 1.025f;
+    }
+
+    private void ResetButtonVisual(DestinationButton b)
+    {
+        if (b.room == currentActiveRoom && b.activeMat != null)
+        {
+            b.buttonRenderer.sharedMaterial = b.activeMat;
+        }
+        else if (b.buttonRenderer != null && b.defaultMat != null)
+        {
+            b.buttonRenderer.sharedMaterial = b.defaultMat;
+        }
+
+        b.buttonObj.transform.localPosition = b.baseLocalPos;
+        b.buttonObj.transform.localScale = b.baseLocalScale;
+    }
+
+    private void RefreshActiveRoomVisuals()
+    {
+        foreach (var b in buttons)
+        {
+            if (b.room == currentActiveRoom)
+            {
+                if (b.buttonRenderer != null && b.activeMat != null)
+                {
+                    b.buttonRenderer.sharedMaterial = b.activeMat;
+                }
+            }
+            else
+            {
+                if (b.buttonRenderer != null && b.defaultMat != null)
+                {
+                    b.buttonRenderer.sharedMaterial = b.defaultMat;
+                }
+            }
+        }
+    }
+
+    private IEnumerator AnimateButtonClick(DestinationButton b)
+    {
+        if (b.buttonRenderer != null && b.pressedMat != null)
+        {
+            b.buttonRenderer.sharedMaterial = b.pressedMat;
+        }
+        b.buttonObj.transform.localPosition = b.baseLocalPos + new Vector3(0f, 0f, 0.008f);
+
+        yield return new WaitForSeconds(0.12f);
+
+        if (b != null)
+        {
+            if (b == hoveredButton) SetButtonHover(b);
+            else ResetButtonVisual(b);
+        }
+    }
+
+    private void TeleportTo(Vector3 destination, Quaternion orientation, DestinationRoom room, string destName)
+    {
+        currentActiveRoom = room;
+
+        if (characterController != null) characterController.enabled = false;
+
+        // Move complete player rig (XR Origin) preserving horizontal head offset
+        GameObject player = (characterController != null) ? characterController.gameObject : gameObject;
+        Vector3 headOffset = Vector3.zero;
+        if (playerCamera != null)
+        {
+            headOffset = playerCamera.transform.position - player.transform.position;
+            headOffset.y = 0f;
+        }
+
+        Vector3 targetRoot = destination - headOffset;
+        targetRoot.y = destination.y;
+        player.transform.position = targetRoot;
+        player.transform.rotation = orientation;
+
+        if (characterController != null) characterController.enabled = true;
+
+        PlayerController pc = player.GetComponent<PlayerController>();
+        if (pc != null)
+        {
+            pc.ResetVerticalVelocity();
+            pc.SetCurrentStationIndex((int)room);
+        }
+
+        // Hide panel after successful teleportation as instructed
+        SetPanelVisibility(false);
+        RefreshActiveRoomVisuals();
+
+        // Trigger narration for entered room
+        if (NarrationManager.Instance != null)
+        {
+            if (room == DestinationRoom.Lab1_FirstLaw) NarrationManager.Instance.OnEnterLab1();
+            else if (room == DestinationRoom.Lab2_SecondLaw) NarrationManager.Instance.OnEnterLab2();
+            else if (room == DestinationRoom.Lab3_ThirdLaw) NarrationManager.Instance.OnEnterLab3();
+            else if (room == DestinationRoom.MainLobby) NarrationManager.Instance.OnEnterMainLobby();
+        }
+
+        Debug.Log($"[Newton VR] Teleported to: {destName} at {destination}. Panel auto-docked.");
+    }
+}

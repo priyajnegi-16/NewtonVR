@@ -1,0 +1,10 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!129 &1
+PlayerSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 26
+  productGUID: 9b2d37f37476e8e4587c47fb59f2f8ee
+  productName: unity vr simulation
+  companyName: DefaultCompany
+  activeInputHandler: 2

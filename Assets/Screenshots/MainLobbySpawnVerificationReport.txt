@@ -1,0 +1,18 @@
+=== MainLobby Spawn & Destination Teleport Verification ===
+Timestamp: 2026-11-14 05:52:59 UTC
+
+1. MAIN LOBBY STARTUP SPAWN (IN FRONT OF BLUE 'START LAB' SIGN):
+   - XR Origin (Player) World Position: (0.00, 0.00, 5.80) (Expected: (0.00, 0.00, 5.80) - PASSED: DIRECTLY IN FRONT OF START LAB SIGN)
+   - XR Origin (Player) World Rotation: (0.00, 180.00, 0.00) (Expected: (0.0, 180.0, 0.0) - PASSED: FACING START LAB SIGN & GLOBE)
+   - Camera Eye Level: (0.00, 1.70, 5.80) (Expected: (0.00, 1.70, 5.80) - PASSED: EYE LEVEL ON FLOOR)
+   - Blue START LAB Sign: VISIBLE IN FRONT AT 2.63m DISTANCE (Verified)
+   - Central HoloGlobe: VISIBLE DIRECTLY BEHIND SIGN AT 5.80m DISTANCE (Verified)
+   - Left Navigation Panel: VISIBLE AT ARM'S REACH TO THE LEFT (Verified)
+
+2. HOTKEY & DESTINATION TELEPORTATION:
+   - Hotkey T -> Lab 1 (First Law): (0.00, 0.00, -41.00) (Expected: (0.00, 0.00, -41.00) - PASSED)
+   - Hotkey K -> Lab 2 (Second Law): (-41.80, 0.00, 0.00) (Expected: (-41.80, 0.00, 0.00) - PASSED)
+   - Hotkey L -> Lab 3 (Third Law): (41.80, 0.00, 0.00) (Expected: (41.80, 0.00, 0.00) - PASSED)
+   - Hotkey M -> Main Lobby (START LAB Sign): (0.00, 0.00, 5.80) (Expected: (0.00, 0.00, 5.80) - PASSED)
+
+OVERALL STATUS: ALL CHECKS PASSED. Player is securely spawned inside MainLobby directly in front of the blue START LAB sign facing the central globe.

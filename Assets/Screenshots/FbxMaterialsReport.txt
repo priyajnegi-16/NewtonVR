@@ -1,0 +1,79 @@
+=== FBX & ASSET IMPORTED MATERIALS CHECK ===
+
+--- Checking: Assets/Environment/NewtonsFirstLawExp.fbx ---
+  Material: 'Callout Purple.002' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Chrome Ball.002' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Hazard Black.002' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Neon Cyan.002' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Hazard Yellow.002' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Lab Floor.002' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Deep Navy.002' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Brushed Silver.002' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Warning Red.002' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Graphite Metal.002' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'UI White.002' | Shader: 'Standard' | Supported: True | BROKEN: False
+Total embedded materials: 11
+
+--- Checking: Assets/Environment/NewtonsSecondLawExp.fbx ---
+  Material: 'UI White' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Lab Floor' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Graphite Metal' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Purple Accent' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Blue Cart' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Neon Cyan' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Deep Navy' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Brushed Silver' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Liquid Glass UI - translucent blue' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Red Cart' | Shader: 'Standard' | Supported: True | BROKEN: False
+Total embedded materials: 10
+
+--- Checking: Assets/Environment/NewtonsThirdLawExp.fbx ---
+  Material: 'Wheel Rubber.001' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Cyan Emissive.001' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Track Silver.001' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'VR Navy.001' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Panel Blue.001' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Green Readout.001' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Display Dark.001' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Violet Emissive.001' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Graphite.001' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Readable White.001' | Shader: 'Standard' | Supported: True | BROKEN: False
+Total embedded materials: 10
+
+--- Checking: Assets/Environment/UnityNewtonFullEnv.fbx ---
+Total embedded materials: 0
+
+--- Checking: Assets/Environment/UnityNewtonFullEnv_Backup.fbx ---
+  Material: 'Screen2' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Dark' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Screen1' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'GlowGold' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'HoloInner' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'GlowGreen' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Disc1' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'GlowRed.001' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'PanelBG' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'GlowCyan' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Steel' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Silhouette' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'GlowWhite' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'TextCyan.001' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'OculusRim' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Carpet' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'BlueOrb' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Wall' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Screen3' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Leaf' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Table' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Grid' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'TeleDisc' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Floor' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Chair' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Neon' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Holo' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Text.001' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'GlowBlue.001' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Beam' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'ConclBG' | Shader: 'Standard' | Supported: True | BROKEN: False
+  Material: 'Disc0' | Shader: 'Standard' | Supported: True | BROKEN: False
+Total embedded materials: 32

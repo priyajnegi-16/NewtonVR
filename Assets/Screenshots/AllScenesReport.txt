@@ -1,0 +1,26 @@
+=== ALL SCENES SHADER AUDIT ===
+
+==========================================
+SCENE: Assets/Scenes/NewtonEnvironment.unity
+==========================================
+Renderers: 751 | Pink: 0 | NullMat: 0
+
+==========================================
+SCENE: Assets/Scenes/NewtonEnvironment_Backup.unity
+==========================================
+Renderers: 834 | Pink: 0 | NullMat: 0
+
+==========================================
+SCENE: Assets/Scenes/NewtonEnvironment_DuplicateBackup.unity
+==========================================
+Renderers: 748 | Pink: 0 | NullMat: 0
+
+==========================================
+SCENE: Assets/Scenes/NewtonEnvironment_PreCleanBackup.unity
+==========================================
+Renderers: 748 | Pink: 0 | NullMat: 0
+
+==========================================
+SCENE: Assets/Scenes/NewtonEnvironment_PreNavPanelBackup.unity
+==========================================
+Renderers: 748 | Pink: 0 | NullMat: 0

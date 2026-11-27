@@ -1,0 +1,29 @@
+fileFormatVersion: 2
+guid: 8f4a1c6e4e5a4f7bb8a01f3e1a2b3c4d
+ModelImporter:
+  serializedVersion: 22200
+  internalIDToNameTable: []
+  externalObjects: {}
+  materials:
+    materialImportMode: 1
+    materialName: 0
+    materialSearch: 1
+    materialLocation: 0
+  animations:
+    legacyGenerateAnimations: 4
+    bakeSimulation: 0
+    resampleCurves: 1
+    optimizeGameObjects: 0
+    motionNodeName: 
+    animationAnimationType: 0
+  meshes:
+    globalScale: 1
+    useFileUnits: 1
+    keepQuads: 0
+    weldVertices: 1
+    bakeAxisConversion: 0
+    meshCompression: 0
+    importBlendShapes: 1
+    importCameras: 0
+    importLights: 1
+    generateColliders: 1

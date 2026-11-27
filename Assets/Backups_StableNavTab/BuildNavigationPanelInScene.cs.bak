@@ -1,0 +1,419 @@
+#if UNITY_EDITOR
+using System.IO;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.SceneManagement;
+using TMPro;
+
+/// <summary>
+/// Editor tool that constructs and saves the brand-new, high-fidelity World Space VR Navigation Panel
+/// directly into the active scene 'Assets/Scenes/NewtonEnvironment.unity' and as a Prefab.
+/// Guarantees the panel physically exists in the scene hierarchy and is immediately visible in Scene View,
+/// Game View, and Play mode.
+/// </summary>
+[InitializeOnLoad]
+public static class BuildNavigationPanelInScene
+{
+    private const string ScenePath = "Assets/Scenes/NewtonEnvironment.unity";
+    private const string PrefabPath = "Assets/Prefabs/FloatingVRDestinationPanel.prefab";
+    private const string TriggerFile = "Assets/Screenshots/TriggerBuildNavPanel.txt";
+
+    static BuildNavigationPanelInScene()
+    {
+        EditorApplication.update += CheckAutoTrigger;
+        EditorApplication.delayCall += ExecuteBuildOnce;
+    }
+
+    private static void CheckAutoTrigger()
+    {
+        if (File.Exists(TriggerFile))
+        {
+            try { File.Delete(TriggerFile); } catch {}
+            ExecuteBuildOnce();
+        }
+    }
+
+    private static void ExecuteBuildOnce()
+    {
+        // Avoid running during play mode
+        if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+
+        // Check if we need to build or refresh the scene panel
+        Scene activeScene = SceneManager.GetActiveScene();
+        if (activeScene.path != ScenePath)
+        {
+            if (File.Exists(ScenePath))
+            {
+                EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            }
+            else
+            {
+                return;
+            }
+        }
+
+        BuildPanelHierarchy();
+    }
+
+    [MenuItem("Newton VR/Build and Place Navigation Panel in Scene", false, 5)]
+    public static void ManualBuild()
+    {
+        if (File.Exists(ScenePath) && SceneManager.GetActiveScene().path != ScenePath)
+        {
+            EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+        }
+
+        BuildPanelHierarchy();
+    }
+
+    public static void BuildPanelHierarchy()
+    {
+        Debug.Log("[Newton VR] Constructing Brand-New World Space VR Navigation Panel in Scene...");
+        Scene activeScene = SceneManager.GetActiveScene();
+
+        // Remove any old/duplicate panel roots in the scene
+        GameObject existing = GameObject.Find("VR_NavigationPanel");
+        if (existing != null)
+        {
+            Object.DestroyImmediate(existing);
+        }
+        GameObject oldSys = GameObject.Find("FloatingVRDestinationPanel_System");
+        if (oldSys != null)
+        {
+            Object.DestroyImmediate(oldSys);
+        }
+
+        // Find Player references in scene
+        PlayerController player = Object.FindFirstObjectByType<PlayerController>();
+        CharacterController cc = player != null ? player.GetComponent<CharacterController>() : Object.FindFirstObjectByType<CharacterController>();
+        Camera cam = player != null ? player.playerCamera : Camera.main;
+        if (cam == null) cam = Object.FindFirstObjectByType<Camera>();
+        Transform leftHand = player != null ? player.leftHandController : null;
+        Transform rightHand = player != null ? player.rightHandController : null;
+
+        // Load LiberationSans SDF font
+        TMP_FontAsset font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>("Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset");
+        if (font == null) font = Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
+        if (font == null && TMP_Settings.defaultFontAsset != null)
+        {
+            font = TMP_Settings.defaultFontAsset;
+        }
+
+        // Room preview textures for authentic VR card visual
+        Texture2D lobbyTex = LoadScreenshotTexture("Assets/Screenshots/MainLobby_PlayerSpawn_View.png");
+        Texture2D lab1Tex = LoadScreenshotTexture("Assets/Screenshots/Inside_Lab1_FirstLaw.png");
+        Texture2D lab2Tex = LoadScreenshotTexture("Assets/Screenshots/Inside_Lab2_SecondLaw.png");
+        Texture2D lab3Tex = LoadScreenshotTexture("Assets/Screenshots/Inside_Lab3_ThirdLaw.png");
+
+        // 1. Root GameObject in Scene: VR_NavigationPanel
+        GameObject panelRoot = new GameObject("VR_NavigationPanel");
+        // Position on the player's LEFT (30° left from (0, 0, -10), arm's reach 1.15m, chest-to-eye height)
+        panelRoot.transform.position = new Vector3(-0.58f, 1.64f, -9.00f);
+        panelRoot.transform.rotation = Quaternion.Euler(10f, -30f, 0f);
+
+        FloatingVRDestinationPanel comp = panelRoot.AddComponent<FloatingVRDestinationPanel>();
+        comp.characterController = cc;
+        comp.playerCamera = cam;
+        comp.leftHandController = leftHand;
+        comp.rightHandController = rightHand;
+        comp.armReachDistance = 1.10f;
+        comp.leftAngleOffset = -28.0f;
+        comp.verticalOffset = 0.02f;
+        comp.upwardTiltAngle = 10.0f;
+
+        // 2. World Space Canvas
+        GameObject canvasGo = new GameObject("VR_WorldSpaceNavCanvas");
+        canvasGo.transform.SetParent(panelRoot.transform, false);
+        canvasGo.transform.localPosition = Vector3.zero;
+        canvasGo.transform.localRotation = Quaternion.identity;
+        canvasGo.transform.localScale = Vector3.one * 0.001f; // 1 unit in Canvas = 1 mm
+
+        Canvas canvas = canvasGo.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.WorldSpace;
+        canvas.worldCamera = cam;
+
+        CanvasScaler scaler = canvasGo.AddComponent<CanvasScaler>();
+        scaler.dynamicPixelsPerUnit = 10f;
+        scaler.referencePixelsPerUnit = 100f;
+
+        canvasGo.AddComponent<GraphicRaycaster>();
+
+        RectTransform canvasRect = canvasGo.GetComponent<RectTransform>();
+        canvasRect.sizeDelta = new Vector2(680f, 520f);
+
+        // Colors
+        Color champagneGold = new Color(0.855f, 0.725f, 0.447f, 1.0f); // #DAB972
+        Color warmIvory     = new Color(1.000f, 0.973f, 0.910f, 1.0f); // #FFF8E8
+        Color pureWhite     = new Color(1.000f, 1.000f, 1.000f, 1.0f); // #FFFFFF
+        Color emeraldGreen  = new Color(0.125f, 0.880f, 0.520f, 1.0f); // #20E085
+        Color smokedBronze  = new Color(0.110f, 0.090f, 0.078f, 0.96f); // #1C1714
+        Color buttonBase    = new Color(0.160f, 0.135f, 0.118f, 0.98f); // #29221E
+
+        // Outer Champagne-Gold Frame
+        GameObject frameObj = CreateUI("Panel_GoldFrame", canvasRect, new Vector2(686f, 526f), Vector2.zero);
+        Image frameImg = frameObj.AddComponent<Image>();
+        frameImg.color = champagneGold;
+
+        // Main Background (Warm Smoked Bronze)
+        GameObject bgObj = CreateUI("Panel_Background", frameObj.transform, new Vector2(680f, 520f), Vector2.zero);
+        Image bgImg = bgObj.AddComponent<Image>();
+        bgImg.color = smokedBronze;
+
+        // Header Emblem Icon: Geometric Diamond in Champagne Gold
+        GameObject emblemObj = CreateUI("Header_Emblem", bgObj.transform, new Vector2(16f, 16f), new Vector2(-300f, 222f));
+        emblemObj.transform.localEulerAngles = new Vector3(0f, 0f, 45f);
+        Image emblemImg = emblemObj.AddComponent<Image>();
+        emblemImg.color = champagneGold;
+
+        // Header Title: NEWTONIAN VR LABORATORY (Bold Pure White)
+        GameObject titleObj = CreateUI("Header_Title", bgObj.transform, new Vector2(500f, 34f), new Vector2(-20f, 230f));
+        TextMeshProUGUI titleTmp = titleObj.AddComponent<TextMeshProUGUI>();
+        if (font != null) titleTmp.font = font;
+        titleTmp.text = "NEWTONIAN VR LABORATORY";
+        titleTmp.fontSize = 26f;
+        titleTmp.fontStyle = FontStyles.Bold;
+        titleTmp.alignment = TextAlignmentOptions.Left;
+        titleTmp.color = pureWhite;
+
+        // Subtitle: SELECT A ROOM TO EXPLORE (Champagne Gold)
+        GameObject subObj = CreateUI("Header_Subtitle", bgObj.transform, new Vector2(500f, 24f), new Vector2(-20f, 204f));
+        TextMeshProUGUI subTmp = subObj.AddComponent<TextMeshProUGUI>();
+        if (font != null) subTmp.font = font;
+        subTmp.text = "SELECT A ROOM TO EXPLORE";
+        subTmp.fontSize = 15f;
+        subTmp.fontStyle = FontStyles.Normal;
+        subTmp.alignment = TextAlignmentOptions.Left;
+        subTmp.color = champagneGold;
+
+        // Upper-Right Close Button (✕)
+        GameObject closeObj = CreateUI("Btn_Close", bgObj.transform, new Vector2(40f, 40f), new Vector2(305f, 222f));
+        GameObject closeFrame = CreateUI("Close_Frame", closeObj.transform, new Vector2(42f, 42f), Vector2.zero);
+        Image cfImg = closeFrame.AddComponent<Image>();
+        cfImg.color = champagneGold * 0.8f;
+        GameObject closeFill = CreateUI("Close_Fill", closeFrame.transform, new Vector2(38f, 38f), Vector2.zero);
+        Image cFillImg = closeFill.AddComponent<Image>();
+        cFillImg.color = new Color(0.20f, 0.16f, 0.14f);
+        GameObject closeTxt = CreateUI("TMP_Close", closeFill.transform, new Vector2(38f, 38f), Vector2.zero);
+        TextMeshProUGUI cTmp = closeTxt.AddComponent<TextMeshProUGUI>();
+        if (font != null) cTmp.font = font;
+        cTmp.text = "X";
+        cTmp.fontSize = 20f;
+        cTmp.fontStyle = FontStyles.Bold;
+        cTmp.alignment = TextAlignmentOptions.Center;
+        cTmp.color = pureWhite;
+        BoxCollider closeCol = closeObj.AddComponent<BoxCollider>();
+        closeCol.size = new Vector3(60f, 60f, 30f);
+
+        // Four Large Destination Buttons
+        float startY = 135f;
+        float spacingY = 82f;
+
+        CreateButton(bgObj.transform, "MAIN LOBBY", "Return to the Central Exhibition Hall", new Vector2(0f, startY), font, champagneGold, buttonBase, emeraldGreen, pureWhite, warmIvory, lobbyTex);
+        CreateButton(bgObj.transform, "ROOM 1 — NEWTON'S FIRST LAW", "Inertia and Motion", new Vector2(0f, startY - spacingY), font, champagneGold, buttonBase, emeraldGreen, pureWhite, warmIvory, lab1Tex);
+        CreateButton(bgObj.transform, "ROOM 2 — NEWTON'S SECOND LAW", "Force, Mass and Acceleration", new Vector2(0f, startY - spacingY * 2), font, champagneGold, buttonBase, emeraldGreen, pureWhite, warmIvory, lab2Tex);
+        CreateButton(bgObj.transform, "ROOM 3 — NEWTON'S THIRD LAW", "Action and Reaction", new Vector2(0f, startY - spacingY * 3), font, champagneGold, buttonBase, emeraldGreen, pureWhite, warmIvory, lab3Tex);
+
+        // Bottom Replay Narration Button
+        GameObject replayObj = CreateUI("Btn_ReplayNarration", bgObj.transform, new Vector2(340f, 38f), new Vector2(0f, -218f));
+        GameObject rFrame = CreateUI("Replay_Frame", replayObj.transform, new Vector2(342f, 40f), Vector2.zero);
+        Image rfImg = rFrame.AddComponent<Image>();
+        rfImg.color = champagneGold * 0.65f;
+        GameObject rFill = CreateUI("Replay_Fill", rFrame.transform, new Vector2(338f, 36f), Vector2.zero);
+        Image rFillImg = rFill.AddComponent<Image>();
+        rFillImg.color = new Color(0.18f, 0.15f, 0.13f);
+        GameObject rTxt = CreateUI("TMP_Replay", rFill.transform, new Vector2(338f, 36f), Vector2.zero);
+        TextMeshProUGUI rTmp = rTxt.AddComponent<TextMeshProUGUI>();
+        if (font != null) rTmp.font = font;
+        rTmp.text = "REPLAY AUDIO NARRATION";
+        rTmp.fontSize = 14f;
+        rTmp.fontStyle = FontStyles.Bold;
+        rTmp.alignment = TextAlignmentOptions.Center;
+        rTmp.color = warmIvory;
+        BoxCollider rCol = replayObj.AddComponent<BoxCollider>();
+        rCol.size = new Vector3(340f, 38f, 20f);
+
+        // 3. Small Navigation Tab (When panel is hidden)
+        GameObject tabCanvasGo = new GameObject("VR_WorldSpaceNavTabCanvas");
+        tabCanvasGo.transform.SetParent(panelRoot.transform, false);
+        tabCanvasGo.transform.localPosition = new Vector3(0f, -0.15f, 0.15f);
+        tabCanvasGo.transform.localScale = Vector3.one * 0.001f;
+
+        Canvas tabCanvas = tabCanvasGo.AddComponent<Canvas>();
+        tabCanvas.renderMode = RenderMode.WorldSpace;
+        tabCanvas.worldCamera = cam;
+        CanvasScaler tabScaler = tabCanvasGo.AddComponent<CanvasScaler>();
+        tabScaler.dynamicPixelsPerUnit = 10f;
+        tabCanvasGo.AddComponent<GraphicRaycaster>();
+
+        RectTransform tabRect = tabCanvasGo.GetComponent<RectTransform>();
+        tabRect.sizeDelta = new Vector2(180f, 60f);
+
+        GameObject tabFrame = CreateUI("Tab_Frame", tabRect, new Vector2(182f, 62f), Vector2.zero);
+        Image tfImg = tabFrame.AddComponent<Image>();
+        tfImg.color = champagneGold;
+
+        GameObject tabFill = CreateUI("Tab_Fill", tabFrame.transform, new Vector2(178f, 58f), Vector2.zero);
+        Image tabFillImg = tabFill.AddComponent<Image>();
+        tabFillImg.color = buttonBase;
+
+        GameObject tabDot = CreateUI("Tab_Dot", tabFill.transform, new Vector2(12f, 12f), new Vector2(-65f, 0f));
+        Image dotImg = tabDot.AddComponent<Image>();
+        dotImg.color = emeraldGreen;
+
+        GameObject tabTxt = CreateUI("TMP_NavTab", tabFill.transform, new Vector2(140f, 58f), new Vector2(12f, 0f));
+        TextMeshProUGUI tabTmp = tabTxt.AddComponent<TextMeshProUGUI>();
+        if (font != null) tabTmp.font = font;
+        tabTmp.text = "LABS";
+        tabTmp.fontSize = 20f;
+        tabTmp.fontStyle = FontStyles.Bold;
+        tabTmp.alignment = TextAlignmentOptions.Center;
+        tabTmp.color = pureWhite;
+
+        BoxCollider tabCol = tabCanvasGo.AddComponent<BoxCollider>();
+        tabCol.size = new Vector3(200f, 70f, 30f);
+
+        tabCanvasGo.SetActive(false); // Hidden while full panel is open
+
+        // 4. Save as Prefab cleanly
+        if (!AssetDatabase.IsValidFolder("Assets/Prefabs"))
+        {
+            AssetDatabase.CreateFolder("Assets", "Prefabs");
+        }
+        if (File.Exists(PrefabPath))
+        {
+            AssetDatabase.DeleteAsset(PrefabPath);
+        }
+        PrefabUtility.SaveAsPrefabAssetAndConnect(panelRoot, PrefabPath, InteractionMode.AutomatedAction);
+        Debug.Log($"[Newton VR] Saved Navigation Panel Prefab to: {PrefabPath}");
+
+        // 5. Save Scene
+        EditorSceneManager.MarkSceneDirty(activeScene);
+        EditorSceneManager.SaveScene(activeScene);
+        Debug.Log($"[Newton VR] Successfully placed and saved VR_NavigationPanel in scene: {ScenePath}");
+    }
+
+    private static void CreateButton(Transform parent, string heading, string description, Vector2 anchoredPos, TMP_FontAsset font, Color champagneGold, Color buttonBase, Color emeraldGreen, Color pureWhite, Color warmIvory, Texture2D previewTex = null)
+    {
+        string cleanName = heading.Replace(" ", "").Replace("—", "").Replace("'", "");
+        GameObject btnObj = CreateUI($"Btn_{cleanName}", parent, new Vector2(630f, 70f), anchoredPos);
+        RectTransform btnRect = btnObj.GetComponent<RectTransform>();
+
+        // Outer Gold Frame
+        GameObject frame = CreateUI("Btn_Frame", btnRect, new Vector2(632f, 72f), Vector2.zero);
+        Image frameImg = frame.AddComponent<Image>();
+        frameImg.color = champagneGold * 0.70f;
+
+        // Background Fill
+        GameObject fill = CreateUI("Btn_Fill", frame.transform, new Vector2(628f, 68f), Vector2.zero);
+        Image fillImg = fill.AddComponent<Image>();
+        fillImg.color = buttonBase;
+
+        // Left Emerald Accent Bar
+        GameObject accent = CreateUI("Btn_Accent", fill.transform, new Vector2(8f, 68f), new Vector2(-310f, 0f));
+        Image accentImg = accent.AddComponent<Image>();
+        accentImg.color = emeraldGreen;
+
+        float textStartX = -290f;
+        if (previewTex != null)
+        {
+            // Room Preview Thumbnail Frame
+            GameObject thumbFrame = CreateUI("Btn_ThumbFrame", fill.transform, new Vector2(76f, 54f), new Vector2(-260f, 0f));
+            Image tfImg = thumbFrame.AddComponent<Image>();
+            tfImg.color = champagneGold * 0.85f;
+
+            // Room Preview Thumbnail RawImage
+            GameObject thumbGo = CreateUI("Btn_Preview", thumbFrame.transform, new Vector2(72f, 50f), Vector2.zero);
+            RawImage rawImg = thumbGo.AddComponent<RawImage>();
+            rawImg.texture = previewTex;
+            rawImg.color = Color.white;
+
+            textStartX = -205f;
+        }
+
+        // Heading Text: Pure White (#FFFFFF), Bold
+        float textWidth = 275f - textStartX;
+        GameObject headObj = CreateUI("TMP_Heading", fill.transform, new Vector2(textWidth, 26f), new Vector2(textStartX + textWidth * 0.5f, 13f));
+        TextMeshProUGUI headTmp = headObj.AddComponent<TextMeshProUGUI>();
+        if (font != null)
+        {
+            headTmp.font = font;
+            if (font.material != null) headTmp.fontSharedMaterial = font.material;
+        }
+        headTmp.text = heading;
+        headTmp.fontSize = 20f;
+        headTmp.fontStyle = FontStyles.Bold;
+        headTmp.alignment = TextAlignmentOptions.Left;
+        headTmp.color = pureWhite;
+
+        // Description Text: Warm Ivory (#FFF8E8)
+        GameObject descObj = CreateUI("TMP_Description", fill.transform, new Vector2(textWidth, 22f), new Vector2(textStartX + textWidth * 0.5f, -14f));
+        TextMeshProUGUI descTmp = descObj.AddComponent<TextMeshProUGUI>();
+        if (font != null)
+        {
+            descTmp.font = font;
+            if (font.material != null) descTmp.fontSharedMaterial = font.material;
+        }
+        descTmp.text = description;
+        descTmp.fontSize = 14f;
+        descTmp.fontStyle = FontStyles.Normal;
+        descTmp.alignment = TextAlignmentOptions.Left;
+        descTmp.color = warmIvory;
+
+        // Right Action Button Badge (Circular Frame with Arrow)
+        GameObject actionObj = CreateUI("Btn_ActionBadge", fill.transform, new Vector2(34f, 34f), new Vector2(285f, 0f));
+        GameObject actionFrame = CreateUI("Action_Frame", actionObj.transform, new Vector2(34f, 34f), Vector2.zero);
+        Image afImg = actionFrame.AddComponent<Image>();
+        afImg.color = champagneGold * 0.90f;
+
+        GameObject actionFill = CreateUI("Action_Fill", actionFrame.transform, new Vector2(30f, 30f), Vector2.zero);
+        Image aFillImg = actionFill.AddComponent<Image>();
+        aFillImg.color = new Color(0.18f, 0.15f, 0.13f);
+
+        GameObject arrowObj = CreateUI("TMP_Arrow", actionFill.transform, new Vector2(30f, 30f), new Vector2(1f, 0f));
+        TextMeshProUGUI arrowTmp = arrowObj.AddComponent<TextMeshProUGUI>();
+        if (font != null)
+        {
+            arrowTmp.font = font;
+            if (font.material != null) arrowTmp.fontSharedMaterial = font.material;
+        }
+        arrowTmp.text = ">";
+        arrowTmp.fontSize = 20f;
+        arrowTmp.fontStyle = FontStyles.Bold;
+        arrowTmp.alignment = TextAlignmentOptions.Center;
+        arrowTmp.color = champagneGold;
+
+        // BoxCollider for Raycast Hit
+        BoxCollider col = btnObj.AddComponent<BoxCollider>();
+        col.size = new Vector3(630f, 70f, 20f);
+        col.center = Vector3.zero;
+    }
+
+    private static GameObject CreateUI(string name, Transform parent, Vector2 size, Vector2 anchoredPos)
+    {
+        GameObject go = new GameObject(name, typeof(RectTransform));
+        go.transform.SetParent(parent, false);
+        RectTransform rt = go.GetComponent<RectTransform>();
+        rt.sizeDelta = size;
+        rt.anchoredPosition = anchoredPos;
+        rt.anchorMin = new Vector2(0.5f, 0.5f);
+        rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        return go;
+    }
+
+    private static Texture2D LoadScreenshotTexture(string path)
+    {
+        Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+        if (tex != null) return tex;
+        if (File.Exists(path))
+        {
+            byte[] data = File.ReadAllBytes(path);
+            Texture2D loaded = new Texture2D(2, 2);
+            if (loaded.LoadImage(data)) return loaded;
+        }
+        return null;
+    }
+}
+#endif

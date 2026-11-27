@@ -1,0 +1,3 @@
+StartPlayModeTest called at 19:51:53. isPlaying: False, isCompiling: False
+Setting EditorApplication.isPlaying = true directly...
+[PlayMode Startup Verification] Frame 3: Player=(0.00, 0.06, 5.83), Camera=(0.00, 1.76, 5.83)

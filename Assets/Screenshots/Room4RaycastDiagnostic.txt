@@ -1,0 +1,25 @@
+=== ROOM 4 TAB RAYCAST DIAGNOSTIC TEST ===
+Room4SpawnPoint: worldPos=(0.00, 0.02, 42.50), localPos=(0.00, 0.02, 42.50), parent=Room4_ObservationCentre, rot=(0.00, 0.00, 0.00)
+Room4_SpawnPoint: NULL
+FloatingVRDestinationPanel.room4SpawnPosition: (0.00, 0.02, 42.50), rot: (0.00, 0.00, 0.00)
+Tab_Results: (-0.702, 1.204, 44.575)
+Tab_Comparison: (0.000, 1.204, 44.575)
+Tab_Conclusion: (0.702, 1.204, 44.575)
+Tab Results Collider: size=(356.00, 66.00, 50.00), center=(0.00, 0.00, -20.00), enabled=True, isTrigger=False
+Tab Results Layer: 0 (Default)
+Tab Results World Bounds: min=(-1.022, 1.148, 44.476), max=(-0.382, 1.296, 44.613), center=(-0.702, 1.222, 44.544)
+Tab Comparison Collider: size=(356.00, 66.00, 50.00), center=(0.00, 0.00, -20.00), enabled=True, isTrigger=False
+Tab Comparison Layer: 0 (Default)
+Tab Comparison World Bounds: min=(-0.320, 1.148, 44.476), max=(0.320, 1.296, 44.613), center=(0.000, 1.222, 44.544)
+Tab Conclusion Collider: size=(356.00, 66.00, 50.00), center=(0.00, 0.00, -20.00), enabled=True, isTrigger=False
+Tab Conclusion Layer: 0 (Default)
+Tab Conclusion World Bounds: min=(0.382, 1.148, 44.476), max=(1.022, 1.296, 44.613), center=(0.702, 1.222, 44.544)
+
+Casting ray from hand (0.00, 1.15, 43.15) to Tab_Comparison (0.00, 1.22, 44.54) (dist=1.40m):
+Total hits along ray: 2
+  Hit [0]: Tab_Comparison (distance=1.343m, isTrigger=False, layer=Default)
+  Hit [1]: TeleBeam (distance=4.706m, isTrigger=False, layer=Default)
+
+Casting ray from hand (0.00, 1.15, 43.15) to Tab_Conclusion (0.70, 1.22, 44.54) (dist=1.56m):
+Total hits along ray: 1
+  Hit [0]: Tab_Conclusion (distance=1.503m, isTrigger=False, layer=Default)

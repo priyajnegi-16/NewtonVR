@@ -1,0 +1,22 @@
+=== FORCE REIMPORT & MATERIAL PIPELINE RESYNC ===
+Timestamp: 2026-11-17 19:55:34 UTC
+Unity Editor: 6000.3.27f1
+Graphics Device: Metal
+Render Pipeline: Built-in Render Pipeline (Standard)
+
+Force re-importing 79 materials...
+Successfully re-imported 79 materials.
+
+Force re-importing Assets/Environment/UnityNewtonFullEnv.fbx...
+FBX re-imported successfully.
+
+Reloading active scene Assets/Scenes/NewtonEnvironment.unity...
+Scene 'NewtonEnvironment' loaded, marked dirty and re-saved cleanly.
+
+Auditing 751 active and inactive scene renderers...
+
+--- FINAL AUDIT RESULT ---
+Valid Shader Slots: 751
+Pink / Error Shader Slots: 0
+Null Material Slots: 0
+Status: PASSED - ZERO PINK OBJECTS IN SCENE

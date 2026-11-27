@@ -1,0 +1,142 @@
+================================================================================
+   NEWTON'S LAWS VR SIMULATION - META QUEST 3 / 3S & PC LINK
+   Complete Interactive Physics Laboratory with Voiceover Narration
+================================================================================
+
+PROJECT OVERVIEW:
+--------------------------------------------------------------------------------
+This project is a standalone, ready-to-open Unity project containing a complete
+virtual reality and desktop interactive physics laboratory demonstrating
+Newton's Three Laws of Motion.
+
+Features:
+- Meta Quest 3S / Quest 3 Touch Plus controller interaction.
+- Stable, rock-solid VR camera and room tracking with zero wobbling.
+- Smooth head-centric snap turning (pivoting around user's head position).
+- Left thumbstick smooth locomotion & hold-to-aim parabolic teleportation.
+- Right controller clean laser pointer ray with 3D depth reticle (visible only when aiming at usable controls).
+- Right trigger button clicking, mass selection, and real-time force slider dragging.
+- Right grip physics-based cart grabbing in Lab 1.
+- Spoken voiceover instructor narrations for Welcome, 1st Law, 2nd Law, 3rd Law, and Conclusion.
+- Independent mass selection (1, 2, 5, 10 kg) and force control (2-20 N) for F = ma.
+- Complete First Law obstacle mechanics (Obstacle Raised and Lowered).
+- Third Law action-reaction collision physics with F1 = -F2 telemetry.
+- Floating 3D VR Navigation Panel and instant Button B station cycling.
+
+HOW TO OPEN IN UNITY (ANY COMPUTER):
+--------------------------------------------------------------------------------
+1. Open Unity Hub on your computer.
+2. Click the 'Add' button (or arrow next to 'Open' -> 'Add project from disk').
+3. Navigate to and select this folder:
+   "Newton_VR_Simulation_Project_Ready_To_Open"
+   (The folder containing 'Assets', 'Packages', and 'ProjectSettings').
+4. Click 'Add Project' and launch it in Unity Editor (Unity 6 / 6000.3.x).
+5. Open 'Assets/Scenes/NewtonEnvironment.unity' and press the Play (▶) button!
+
+HOW TO TEST WITH META QUEST LINK / AIR LINK:
+--------------------------------------------------------------------------------
+1. Connect your Meta Quest 3 / Quest 3S headset to your PC via Link cable or Air Link.
+2. Inside the headset, launch Quest Link from the universal menu.
+3. In Unity Editor, press Play (▶).
+4. The simulation streams directly to your headset with full 6DoF head tracking
+   and Touch Plus controller support!
+
+================================================================================
+TOUCH PLUS CONTROLLER MAPPING (META QUEST 3S):
+================================================================================
+
+RIGHT CONTROLLER:
+--------------------------------------------------------------------------------
+• BUTTON [B] (Top Face Button) — INSTANT ROOM SWITCHING:
+  - Press [B] to instantly jump to the next destination in the repeating sequence:
+      1. MainLobby (Central Start Hub facing HoloGlobe & START LAB pedestal)
+      2. Lab 1 — Newton's First Law (Inertia track & obstacle)
+      3. Lab 2 — Newton's Second Law (F = ma carts, masses & force slider)
+      4. Lab 3 — Newton's Third Law (Action-Reaction collision track)
+      5. Back to MainLobby
+  - One press = one room change.
+  - Holding [B] will NOT repeatedly cycle rooms; releasing and pressing again is required.
+  - Instant repositioning of the XR Origin directly to the destination spawn point.
+  - Ray-based teleportation is completely eliminated (no teleport rays, no landing markers, no thumbstick click).
+
+• INDEX TRIGGER (Front Trigger):
+  - Point your right controller at ANY experiment control:
+    • START LAB pedestal button in the central lobby
+    • Lab 1: Launch / Stop, Reset, Obstacle toggle, Friction control
+    • Lab 2: Launch, Stop, Reset, Mass buttons (10kg, 1kg, 2kg, 5kg), Force Step buttons
+    • Lab 2 Force Slider: Squeeze and hold trigger to smoothly drag force between 2 N and 20 N!
+    • Lab 3: Push Left, Push Right, Reset, Stop
+    • Floating Destination Menu buttons: Point and pull trigger to jump directly to any room!
+  - Squeeze the trigger to activate the control with crisp haptic vibration feedback.
+  - Note: The right laser pointer ray and reticle are visible ONLY when aiming at usable
+    controls, automatically hiding when aiming at empty space to keep your view uncluttered!
+
+• BUTTON [A] (Bottom Face Button):
+  - Alternative trigger click! Point at any control and press [A] to activate it.
+
+• THUMBSTICK (Tilt Left / Right):
+  - Snap turning. Flick left or right to turn in comfortable 45° increments.
+  - Rotates cleanly around your head's world position, eliminating all scene wobble.
+
+• GRIP BUTTON (Side Handle Button):
+  - Squeeze and hold on the Lab 1 cart to physically grab and pull it along the track.
+  - Release grip to let the cart roll freely.
+
+LEFT CONTROLLER:
+--------------------------------------------------------------------------------
+• BUTTON [X] (Bottom Face Button) — ROOM NAVIGATION PANEL:
+  - Press [X] to open or close the 3D Floating Room Navigation Panel on your left.
+  - At startup, the full panel appears OPEN automatically positioned 25-35° to your left.
+  - Use the right controller pointer and trigger to select any room directly.
+  - (Button [Y] and Menu Button also serve as convenient shortcuts to toggle this panel).
+
+• THUMBSTICK (Tilt):
+  - Smooth locomotion. Tilt forward/back/left/right to walk smoothly relative
+    to where your headset is looking.
+
+• WRIST DIAGNOSTIC DISPLAY:
+  - Glancing at your left controller shows a compact high-contrast HUD:
+    • Current Room
+    • Right [B] Button state ([PRESSED - JUMP] in cyan / [READY])
+    • Left [X] Button state ([PRESSED - MENU] in green / [READY])
+    • 3D Nav Panel state (OPEN (LEFT) / CLOSED (TAB))
+    • Total Room Jumps Executed
+
+================================================================================
+META QUEST 3S NATURAL HAND TRACKING (NO CONTROLLERS NEEDED):
+================================================================================
+• PUT CONTROLLERS DOWN TO ACTIVATE HAND TRACKING:
+  - The simulation seamlessly tracks your real left and right hands!
+  - 3D tracked hand models display palm, wrist, and finger positions.
+
+• POINTING & HOVERING:
+  - Point your index finger at any room button on the 3D Navigation Panel.
+  - The targeted button highlights in radiant Emerald Green with champagne-gold borders.
+  - A glowing 3D depth reticle shows the exact point of interaction.
+
+• INDEX-TO-THUMB PINCH TO SELECT:
+  - Pinch your index finger and thumb together to select the highlighted button.
+  - A glowing emerald energy orb pulses between your fingertips for instant tactile feedback!
+  - Selecting a room teleports your complete XR Origin to that lab and auto-hides the panel.
+
+• OPENING & CLOSING WITH HANDS:
+  - When the full panel is open: Pinch the upper-right [✕] button to hide it.
+  - When the full panel is closed: A sleek floating "🧭 LABS" navigation tab floats comfortably
+    on your left. Point and pinch the tab to reopen the full navigation panel anytime!
+
+================================================================================
+DESKTOP KEYBOARD & MOUSE SHORTCUTS (FALLBACK):
+================================================================================
+• W, A, S, D / Arrow Keys : Walk
+• Mouse : Look around (click Game view to lock cursor, ESC to unlock)
+• Left Click or [E] : Interact / Click buttons
+• [B] : Cycle Next Room (MainLobby -> Lab 1 -> Lab 2 -> Lab 3 -> MainLobby)
+• [M] : Jump to Main Lobby
+• [T] : Jump to Lab 1 (First Law)
+• [K] : Jump to Lab 2 (Second Law)
+• [L] : Jump to Lab 3 (Third Law)
+• [N] : Toggle 3D Navigation Panel (also Tab or V)
+• [P] : Replay Room Narration
+• [U] : Toggle Draw Mode (Unlit / Shaded)
+• [H] : Toggle Desktop Controls HUD
+================================================================================

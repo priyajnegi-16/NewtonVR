@@ -1,0 +1,4 @@
+System.NullReferenceException: Object reference not set to an instance of an object
+  at FloatingVRDestinationPanel.BindExistingCanvasButtons () [0x0000d] in /Users/manasitripathi/Downloads/Newton_VR_Simulation_Project_Ready_To_Open 3/Assets/Scripts/FloatingVRDestinationPanel.cs:281 
+  at ScreenshotCaptureTool.RunRoom4ClickAndTeleportFixSuite () [0x0009b] in /Users/manasitripathi/Downloads/Newton_VR_Simulation_Project_Ready_To_Open 3/Assets/Scripts/Editor/ScreenshotCaptureTool.cs:2468 
+  at ScreenshotCaptureTool.CheckAutoCapture () [0x00240] in /Users/manasitripathi/Downloads/Newton_VR_Simulation_Project_Ready_To_Open 3/Assets/Scripts/Editor/ScreenshotCaptureTool.cs:119 

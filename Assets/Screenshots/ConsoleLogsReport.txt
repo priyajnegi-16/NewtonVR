@@ -1,0 +1,3 @@
+=== UNITY EDITOR CONSOLE LOG DUMP ===
+Total console entries: 0
+
